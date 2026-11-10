@@ -149,7 +149,7 @@ func (g *SliderGenerator) Generate(param *model.GenerateParam) (*model.ImageCapt
 		RandomX:               randomX,
 		RandomY:               randomY,
 		Tolerant:              0.02,
-		TolerantBox:           &model.TolerantBox{Left: 8.0, Right: 8.0, Top: 8.0, Bottom: 8.0}, // 左右允许偏差各 8px (原图)，折算到前端屏幕约 ±4.5px
+		TolerantBox:           &model.TolerantBox{Left: 6.0, Right: 6.0, Top: 6.0, Bottom: 6.0}, // 左右中心对齐允许偏差各 6px (原图)，折算到前端屏幕约 ±3px
 	}, nil
 }
 
@@ -209,13 +209,22 @@ func (g *SliderV2Generator) Generate(param *model.GenerateParam) (*model.ImageCa
 	startX := 10
 	startY := randomY // 起点 Y 与终点 Y 相同，确保视觉上滑块 Y 轴固定不变
 
-	// 3. 贝塞尔控制点 (CX, CY): 轻微上弧（controlY 稍高于 startY），视觉自然，终点严格对齐
+	// 3. 贝塞尔控制点 (CX, CY): 显著增强曲线弧度（50~80px），根据缺口纵坐标自适应向上/向下大幅度弧线，终点保证 100% 重合对齐
 	controlX := (startX + randomX) / 2
-	// 轻微弧度：向上偏移 15~35px，不会改变终点坐标
-	arcOffset := 15 + rand.Intn(21)
-	controlY := randomY - arcOffset
-	if controlY < 10 {
-		controlY = 10
+	arcOffset := 55 + rand.Intn(36) // 较大幅度弧度 55~90px
+	var controlY int
+	if randomY >= (bgH-tplH)/2 {
+		// 缺口在偏下部分，向上做大拱形弧线
+		controlY = randomY - arcOffset
+		if controlY < 10 {
+			controlY = 10
+		}
+	} else {
+		// 缺口在偏上部分，向下做深凹弧线
+		controlY = randomY + arcOffset
+		if controlY > bgH-tplH-10 {
+			controlY = bgH - tplH - 10
+		}
 	}
 
 	// 4. 镂空目标缺口并叠加阴影 (仅保留这一个真实目标缺口)
@@ -247,7 +256,8 @@ func (g *SliderV2Generator) Generate(param *model.GenerateParam) (*model.ImageCa
 		TemplateImageHeight:   tplH,
 		RandomX:               randomX,
 		RandomY:               randomY,
-		Tolerant:              0.04,
+		Tolerant:              0.02,
+		TolerantBox:           &model.TolerantBox{Left: 6.0, Right: 6.0, Top: 6.0, Bottom: 6.0}, // 左右中心对齐允许偏差各 6px (原图)，折算到前端屏幕约 ±3px
 		ViewData: map[string]interface{}{
 			"startX":   startX,
 			"startY":   startY,
@@ -638,7 +648,7 @@ func (g *ShapeClickGenerator) Generate(param *model.GenerateParam) (*model.Image
 	}
 	interfCount := param.InterferenceCount
 	if interfCount <= 0 {
-		interfCount = 2
+		interfCount = 3 // 默认增加至 3 个干扰图形（共 6 个几何图形）
 	}
 	total := checkCount + interfCount
 
@@ -679,25 +689,37 @@ func (g *ShapeClickGenerator) Generate(param *model.GenerateParam) (*model.Image
 	for i := 0; i < total; i++ {
 		b := blocks[i]
 		col := imageutil.RandomColor()
-		deg := float64(rand.Intn(70) - 35) // 背景图中的几何图形带有随机旋转倾斜 (-35° ~ +35°)
-		shapeImg := imageutil.DrawShapeIcon(shapes[i], b.w, b.h, col)
+		// 1. 全向随机旋转角度 (0° ~ 360°)
+		deg := float64(rand.Intn(360))
+		// 2. 动态随机尺寸扰动 (50px ~ 70px)
+		curSize := 50 + rand.Intn(21)
+		shapeImg := imageutil.DrawShapeIcon(shapes[i], curSize, curSize, col)
 		rotatedShape := imageutil.RotateImage(shapeImg, deg)
-		imageutil.OverlayImage(bg, rotatedShape, b.x, b.y)
+		// 居中绘制在 block 网格单元内
+		offsetX := b.x + (b.w-curSize)/2
+		offsetY := b.y + (b.h-curSize)/2
+		imageutil.OverlayImage(bg, rotatedShape, offsetX, offsetY)
 
 		if i < checkCount {
 			clickPoints = append(clickPoints, model.ClickPoint{
-				X:      b.x + b.w/2,
-				Y:      b.y + b.h/2,
-				Width:  b.w,
-				Height: b.h,
+				X:      offsetX + curSize/2,
+				Y:      offsetY + curSize/2,
+				Width:  curSize,
+				Height: curSize,
 				Tip:    shapes[i],
 			})
 
-			// 绘制在提示栏上 (尺寸 36x36，提示栏保持正向标准姿态，提高用户对比辨识乐趣)
+			// 绘制在提示栏上 (尺寸 36x36，提示栏带有 ±15° 轻微姿态，增加立体辨识对抗性)
 			tipShape := imageutil.DrawShapeIcon(shapes[i], 36, 36, col)
-			imageutil.OverlayImage(tipBanner, tipShape, i*56+10, 4)
+			tipDeg := float64(rand.Intn(31) - 15) // ±15° 微倾斜
+			rotatedTip := imageutil.RotateImage(tipShape, tipDeg)
+			imageutil.OverlayImage(tipBanner, rotatedTip, i*56+10, 4)
 		}
 	}
+
+	// 在上方提示栏 (tipBanner) 上强化干扰：3 条贯穿干扰折线 + 8 个随机干扰噪点
+	imageutil.DrawNoiseLines(tipBanner, 3, nil)
+	imageutil.DrawNoisePoints(tipBanner, 8, nil)
 
 	bgBase64, err := imageutil.ToBase64JPEG(bg, 85)
 	if err != nil {
@@ -821,7 +843,7 @@ func (g *DragDropGenerator) Generate(param *model.GenerateParam) (*model.ImageCa
 		RandomX:               randomX,
 		RandomY:               randomY,
 		Tolerant:              0.02,
-		TolerantBox:           &model.TolerantBox{Left: 10.0, Right: 10.0, Top: 8.0, Bottom: 8.0}, // 水平允许各 10px，垂直允许各 8px (原图)，折算前端屏幕约 ±5px
+		TolerantBox:           &model.TolerantBox{Left: 6.0, Right: 6.0, Top: 6.0, Bottom: 6.0}, // 水平与垂直中心对齐允许偏差各 6px (原图)，折算前端屏幕约 ±3px
 		ViewData: map[string]interface{}{
 			"initX":   initX,
 			"initY":   initY,

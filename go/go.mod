@@ -1,9 +1,7 @@
 module captcha
 
-go 1.27.3
+go 1.25.11
 
-require (
-	golang.org/x/image v0.47.0 // indirect
-	golang.org/x/sys v0.49.0 // indirect
-	golang.org/x/text v0.43.0 // indirect
-)
+require golang.org/x/image v0.24.0
+
+require golang.org/x/text v0.22.0 // indirect

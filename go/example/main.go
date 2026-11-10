@@ -71,6 +71,8 @@ func main() {
 						<a class="btn" href="javascript:loadCaptcha('ROTATE_DEGREE')">角度验证 (ROTATE_DEGREE)</a>
 						<a class="btn" href="javascript:loadCaptcha('CONCAT')">滑动还原 (CONCAT)</a>
 						<a class="btn" href="javascript:loadCaptcha('WORD_IMAGE_CLICK')">文字点选 (WORD_CLICK)</a>
+						<a class="btn" href="javascript:loadCaptcha('SHAPE_CLICK')">图形点选 (SHAPE_CLICK)</a>
+						<a class="btn" href="javascript:loadCaptcha('DRAG_DROP')">自由拖拽 (DRAG_DROP)</a>
 					</div>
 					<div id="preview">
 						<p style="color: #999;">点击上方按钮预览生成的验证码底图与模板...</p>
@@ -99,8 +101,8 @@ func main() {
 								if (type === 'ROTATE_DEGREE') {
 									html += '<div style="margin-top:8px;color:#1890ff;font-size:13px;">提示：拖动滑块使整张图片角度摆正</div>';
 								}
-								if (data.data.type === 'WORD_IMAGE_CLICK' && data.data.templateImage) {
-									html += '<div style="margin-top:10px;"><b>点选提示词：</b><img src="' + data.data.templateImage + '" style="vertical-align:middle;height:28px;"></div>';
+								if ((data.data.type === 'WORD_IMAGE_CLICK' || data.data.type === 'SHAPE_CLICK') && data.data.templateImage) {
+									html += '<div style="margin-top:10px;"><b>点选提示：</b><img src="' + data.data.templateImage + '" style="vertical-align:middle;height:28px;"></div>';
 								}
 								html += '<p style="font-size:12px;color:#888;margin-top:8px;">ID: ' + data.data.id + '</p>';
 								prev.innerHTML = html;

@@ -47,6 +47,8 @@ func (v *SimpleValidator) GenerateValidData(info *model.ImageCaptchaInfo) (map[s
 		data["randomY"] = info.RandomY
 		data["bgW"] = info.BackgroundImageWidth
 		data["bgH"] = info.BackgroundImageHeight
+		data["templateWidth"] = info.TemplateImageWidth
+		data["templateHeight"] = info.TemplateImageHeight
 	case model.TypeDragDrop:
 		data["targetX"] = float64(info.RandomX) / float64(info.BackgroundImageWidth)
 		data["targetY"] = float64(info.RandomY) / float64(info.BackgroundImageHeight)
@@ -54,6 +56,8 @@ func (v *SimpleValidator) GenerateValidData(info *model.ImageCaptchaInfo) (map[s
 		data["randomY"] = info.RandomY
 		data["bgW"] = info.BackgroundImageWidth
 		data["bgH"] = info.BackgroundImageHeight
+		data["templateWidth"] = info.TemplateImageWidth
+		data["templateHeight"] = info.TemplateImageHeight
 	case model.TypeWordImageClick, model.TypeShapeClick:
 		points, ok := info.Expand.([]model.ClickPoint)
 		if !ok {
@@ -190,18 +194,51 @@ func (v *SimpleValidator) validateDragDrop(track *model.ImageCaptchaTrack, valid
 	userPxX := lastTrack.X
 	userPxY := lastTrack.Y
 
-	// 计算四向偏差 (像素)
+	// 模板尺寸（用于计算中心点）
+	tplW, tplH := 0, 0
+	if tw, ok := validData["templateWidth"].(int); ok && tw > 0 {
+		tplW = tw
+	} else if tw, ok := validData["templateWidth"].(float64); ok && tw > 0 {
+		tplW = int(tw)
+	}
+	if th, ok := validData["templateHeight"].(int); ok && th > 0 {
+		tplH = th
+	} else if th, ok := validData["templateHeight"].(float64); ok && th > 0 {
+		tplH = int(th)
+	}
+
+	// 兼容偏移量 compatibleOffset（支持从 validData 配置或默认 0）
+	compatibleOffsetX, compatibleOffsetY := 0.0, 0.0
+	if ox, ok := validData["offsetX"].(float64); ok {
+		compatibleOffsetX = ox
+	} else if ox, ok := validData["offset"].(float64); ok {
+		compatibleOffsetX = ox
+	}
+	if oy, ok := validData["offsetY"].(float64); ok {
+		compatibleOffsetY = oy
+	}
+
+	// 计算滑块中心点与阴影缺口中心点
+	// 阴影中心 = 缺口左边缘/上边缘 + 模板尺寸的一半
+	// 滑块中心 = 用户放置绝对坐标 + 兼容偏移量 + 模板尺寸的一半
+	shadowCenterX := targetPxX + float64(tplW)/2.0
+	shadowCenterY := targetPxY + float64(tplH)/2.0
+
+	sliderCenterX := userPxX + compatibleOffsetX + float64(tplW)/2.0
+	sliderCenterY := userPxY + compatibleOffsetY + float64(tplH)/2.0
+
+	// 计算四向中心偏差 (像素)
 	// deltaX > 0 表示偏右，deltaX < 0 表示偏左
 	// deltaY > 0 表示偏下，deltaY < 0 表示偏上
-	deltaX := userPxX - targetPxX
-	deltaY := userPxY - targetPxY
+	deltaX := sliderCenterX - shadowCenterX
+	deltaY := sliderCenterY - shadowCenterY
 
 	topPx, bottomPx, leftPx, rightPx := resolveTolerantBox(validData, v.DefaultTolerant, bgW, bgH)
 
-	log.Printf("[DRAG_DROP] user=(%.1f, %.1f) target=(%.1f, %.1f) | deltaX=%.2f deltaY=%.2f | box(L=%.1f, R=%.1f, T=%.1f, B=%.1f)",
-		userPxX, userPxY, targetPxX, targetPxY, deltaX, deltaY, leftPx, rightPx, topPx, bottomPx)
+	log.Printf("[DRAG_DROP] sliderCenter=(%.1f, %.1f) shadowCenter=(%.1f, %.1f) | delta=(%.2f, %.2f) | box(L=%.1f, R=%.1f, T=%.1f, B=%.1f)",
+		sliderCenterX, sliderCenterY, shadowCenterX, shadowCenterY, deltaX, deltaY, leftPx, rightPx, topPx, bottomPx)
 
-	// 水平方向校验：-leftPx <= deltaX <= rightPx
+	// 水平方向镜像/对称容差校验：-leftPx <= deltaX <= rightPx
 	if deltaX < -leftPx || deltaX > rightPx {
 		if deltaX < -leftPx {
 			return model.CheckFail[interface{}](fmt.Sprintf("拼图偏左 %.1fpx，请对齐缺口", math.Abs(deltaX)))
@@ -209,7 +246,7 @@ func (v *SimpleValidator) validateDragDrop(track *model.ImageCaptchaTrack, valid
 		return model.CheckFail[interface{}](fmt.Sprintf("拼图偏右 %.1fpx，请对齐缺口", deltaX))
 	}
 
-	// 垂直方向校验：-topPx <= deltaY <= bottomPx
+	// 垂直方向镜像/对称容差校验：-topPx <= deltaY <= bottomPx
 	if deltaY < -topPx || deltaY > bottomPx {
 		if deltaY < -topPx {
 			return model.CheckFail[interface{}](fmt.Sprintf("拼图偏上 %.1fpx，请对齐缺口", math.Abs(deltaY)))
@@ -243,16 +280,41 @@ func (v *SimpleValidator) validateSlider(track *model.ImageCaptchaTrack, validDa
 		targetPxX = p * float64(bgW)
 	}
 
+	// 模板宽度（用于计算中心点）
+	tplW := 0
+	if tw, ok := validData["templateWidth"].(int); ok && tw > 0 {
+		tplW = tw
+	} else if tw, ok := validData["templateWidth"].(float64); ok && tw > 0 {
+		tplW = int(tw)
+	}
+
+	// 兼容偏移量 compatibleOffset（支持从 validData 配置或默认 0）
+	compatibleOffset := 0.0
+	if offset, ok := validData["offset"].(float64); ok {
+		compatibleOffset = offset
+	} else if offset, ok := validData["offset"].(int); ok {
+		compatibleOffset = float64(offset)
+	}
+
 	// 用户滑动绝对像素距离
 	userSlidePx := lastTrack.X - firstTrack.X
-	deltaX := userSlidePx - targetPxX // >0 偏右，<0 偏左
+
+	// 计算滑块中心点与阴影缺口中心点
+	// 阴影中心 = 缺口左边缘 + 模板宽度的一半
+	// 滑块中心 = 用户滑动距离 + 兼容偏移量 + 模板宽度的一半
+	shadowCenterX := targetPxX + float64(tplW)/2.0
+	sliderCenterX := userSlidePx + compatibleOffset + float64(tplW)/2.0
+
+	// 中心偏差 (deltaCenterX > 0 偏右，< 0 偏左)
+	deltaCenterX := sliderCenterX - shadowCenterX
 
 	_, _, leftPx, rightPx := resolveTolerantBox(validData, v.DefaultTolerant, bgW, bgH)
 
-	log.Printf("[SLIDER] userSlide=%.1fpx target=%.1fpx | deltaX=%.2fpx | allowed=[-%.1fpx, +%.1fpx]",
-		userSlidePx, targetPxX, deltaX, leftPx, rightPx)
+	log.Printf("[SLIDER] sliderCenter=%.1fpx shadowCenter=%.1fpx (offset=%.1fpx) | deltaCenterX=%.2fpx | allowed=[-%.1fpx, +%.1fpx]",
+		sliderCenterX, shadowCenterX, compatibleOffset, deltaCenterX, leftPx, rightPx)
 
-	if deltaX < -leftPx || deltaX > rightPx {
+	// 镜像/对称容差校验：-leftPx <= deltaCenterX <= rightPx
+	if deltaCenterX < -leftPx || deltaCenterX > rightPx {
 		return model.CheckFail[interface{}]("滑动未对齐缺口，请重试")
 	}
 

@@ -110,7 +110,7 @@
           :style="{
             height: `${concatTopHeight}px`,
             backgroundImage: `url(${captchaData.backgroundImage})`,
-            backgroundSize: `${width}px ${boardHeight}px`,
+            backgroundSize: `${boardWidth}px ${boardHeight}px`,
             backgroundPositionX: `${concatLeft}px`,
             backgroundPositionY: '0px'
           }"
@@ -224,10 +224,15 @@ const handleRef = ref<HTMLDivElement>();
 const loading = ref(false);
 const captchaData = ref<CaptchaVO | null>(null);
 
+// 容器内画板真实物理宽度 (扣除 .tac-captcha 左右各 12px padding)
+const boardWidth = computed(() => {
+  return props.width - 24;
+});
+
 // Scale ratio from natural background size to display size
 const scaleRatio = computed(() => {
   if (!captchaData.value || !captchaData.value.backgroundImageWidth) return 1;
-  return props.width / captchaData.value.backgroundImageWidth;
+  return boardWidth.value / captchaData.value.backgroundImageWidth;
 });
 
 const boardHeight = computed(() => {
@@ -246,7 +251,7 @@ const handleLeft = ref(0);
 const isDragging = ref(false);
 const dragStartX = ref(0);
 const maxHandleDrag = computed(() => {
-  if (!trackBarRef.value) return props.width - 40;
+  if (!trackBarRef.value) return boardWidth.value - 40;
   return trackBarRef.value.clientWidth - 40;
 });
 
@@ -254,7 +259,7 @@ const maxHandleDrag = computed(() => {
 // 滑动拼图块的横向移动位移映射：与整幅背景图宽度严格等比联动
 const sliderLeft = computed(() => {
   if (maxHandleDrag.value <= 0) return 0;
-  return (handleLeft.value / maxHandleDrag.value) * props.width;
+  return (handleLeft.value / maxHandleDrag.value) * boardWidth.value;
 });
 
 // Rotate degree mapped (0 到 360 度)
@@ -275,7 +280,7 @@ const concatTopHeight = computed(() => {
 // Concat offset mapped: 背景图位移距离
 const concatLeft = computed(() => {
   if (maxHandleDrag.value <= 0) return 0;
-  return (handleLeft.value / maxHandleDrag.value) * props.width;
+  return (handleLeft.value / maxHandleDrag.value) * boardWidth.value;
 });
 
 // SliderV2 曲线轨迹二维坐标计算
@@ -309,9 +314,9 @@ const sliderV2Pos = computed(() => {
   // t 是滑块拖动手柄占整个轨道宽度的百分比进度 (0.0 ~ 1.0)
   const t = Math.max(0, Math.min(1, handleLeft.value / maxHandleDrag.value));
 
-  // 1. X 坐标随手柄 1:1 线性位移
+  // 1. X 坐标随手柄 1:1 线性位移，与画板实际显示宽度严格对齐
   // 当 t = rawTargetX / bgW 时，x 恰好等于 targetX (rawTargetX * scale)，即阴影缺口的绝对位置！
-  const x = t * props.width;
+  const x = t * boardWidth.value;
 
   // 2. Y 坐标在到达缺口前沿抛物线产生优雅微弧，到达缺口时高度与缺口 100% 绝对重合
   const targetRatio = rawTargetX / bgW;
@@ -548,7 +553,7 @@ const onPieceDragMove = (e: MouseEvent | TouchEvent) => {
   let ny = clientY - boardRect.top - dragPieceOffset.y;
 
   // 拖动范围允许稍微超出 5px 边缘缓冲，确保边界贴边缺口也能 100% 完整重合覆盖
-  const maxW = Math.round(props.width - dragDropSize.value.w + 6);
+  const maxW = Math.round(boardWidth.value - dragDropSize.value.w + 6);
   const maxH = Math.round(boardHeight.value - dragDropSize.value.h + 6);
 
   if (nx < -6) nx = -6;
