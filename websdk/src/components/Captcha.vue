@@ -802,7 +802,6 @@ defineExpose({
   cursor: pointer;
   touch-action: none;
 }
-}
 
 .tac-bg-img {
   width: 100%;
@@ -1041,7 +1040,6 @@ defineExpose({
   border: 1px solid #e4e7ed;
   overflow: hidden;
   touch-action: none;
-}
 }
 
 .tac-track-bg {

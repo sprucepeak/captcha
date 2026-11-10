@@ -564,7 +564,7 @@ func (g *WordClickGenerator) Generate(param *model.GenerateParam) (*model.ImageC
 
 	for i := 0; i < total; i++ {
 		b := blocks[i]
-		deg := float64(rand.Intn(70) - 35)
+		deg := float64(rand.Intn(40) - 20)
 		col := imageutil.RandomColor()
 		// 背景图字渲染：可让各文字在字体池中多样化或者统一采用独立于 tipFont 的字体
 		currentWordFont := imageutil.GetDistinctFont(tipFont)

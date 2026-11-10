@@ -119,8 +119,8 @@ func DrawWordImg(word string, fnt *opentype.Font, fontSize float64, col color.Co
 		srcImg = RotateImage(srcImg, deg)
 	}
 
-	// 增加微小波浪扭曲与微扰 (Sine wave distortion / Warp)，破坏标准字形结构，有效对抗 OCR 提取
-	return WarpSinImage(srcImg, 2.5, 18.0), nil
+	// 保持字体形态自然清晰易辨，使用极小幅度的正弦波微扰，避免汉字严重扭曲变形
+	return WarpSinImage(srcImg, 0.8, 30.0), nil
 }
 
 // WarpSinImage applies a subtle horizontal & vertical sine wave distortion to the image
@@ -235,6 +235,21 @@ var idiomPhrases = []string{
 	"厚积薄发", "宁静致远", "志存高远", "乘风破浪",
 	"生龙活虎", "万里晴空", "紫气东来", "万象更新",
 	"星月交辉", "云淡风轻", "金石为开", "百花齐放",
+	"气吞山河", "高瞻远瞩", "海纳百川", "繁花似锦",
+	"波澜壮阔", "蒸蒸日上", "意气风发", "大展宏图",
+	"龙腾虎跃", "鸟语花香", "朝气蓬勃", "昂首挺胸",
+	"日新月异", "力争上游", "笃行致远", "惟实励新",
+	"迎难而上", "心旷神怡", "风华正茂", "勇往直前",
+	"巧夺天工", "豁然开朗", "山清水秀", "春意盎然",
+	"秋高气爽", "繁星闪烁", "同舟共济", "欣欣向荣",
+	"脚踏实地", "神采奕奕", "前程似锦", "胸有成竹",
+	"博览群书", "精益求精", "温故知新", "学以致用",
+	"返璞归真", "卓尔不群", "和衷共济", "奋发图强",
+	"百折不挠", "坚持不懈", "持之以恒", "水滴石穿",
+	"行稳致远", "勇立潮头", "开天辟地", "众志成城",
+	"通情达理", "实事求是", "开卷有益", "大智若愚",
+	"虚怀若谷", "兼收并蓄", "融会贯通", "妙手回春",
+	"安居乐业", "国泰民安", "欣欣自得", "岁月静好",
 }
 
 func RandomIdiomOrPoemPhrase() string {
