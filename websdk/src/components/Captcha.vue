@@ -854,8 +854,8 @@ defineExpose({
   left: 0;
   width: 100%;
   height: 0;
-  border-top: 2px dashed #ffffff;
-  filter: drop-shadow(0 0 1.5px rgba(0, 0, 0, 0.85));
+  border-top: 1px dashed rgba(255, 255, 255, 0.95);
+  filter: drop-shadow(0 0 1px rgba(0, 0, 0, 0.8));
   transform: translateY(-50%);
 }
 
@@ -864,8 +864,8 @@ defineExpose({
   left: 50%;
   width: 0;
   height: 100%;
-  border-left: 2px dashed #ffffff;
-  filter: drop-shadow(0 0 1.5px rgba(0, 0, 0, 0.85));
+  border-left: 1px dashed rgba(255, 255, 255, 0.95);
+  filter: drop-shadow(0 0 1px rgba(0, 0, 0, 0.8));
   transform: translateX(-50%);
 }
 
