@@ -518,10 +518,16 @@ func (g *WordClickGenerator) Generate(param *model.GenerateParam) (*model.ImageC
 	}
 	total := checkCount + interfCount
 
-	// Choose characters
+	// 优先选取经典成语/四字短语提升点选语义关联性（如日中天、风和日丽等）
 	chars := make([]string, total)
+	phrase := imageutil.RandomIdiomOrPoemPhrase()
+	phraseRunes := []rune(phrase)
 	for i := 0; i < total; i++ {
-		chars[i] = imageutil.RandomChineseChar()
+		if i < len(phraseRunes) && i < checkCount {
+			chars[i] = string(phraseRunes[i])
+		} else {
+			chars[i] = imageutil.RandomChineseChar()
+		}
 	}
 
 	type block struct {

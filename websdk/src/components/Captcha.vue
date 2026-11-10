@@ -1,5 +1,5 @@
 <template>
-  <div class="tac-captcha" :style="{ width: `${width}px` }">
+  <div class="tac-captcha" :class="{ 'tac-shake': isShaking }" :style="{ width: `${width}px` }">
     <!-- Header: Tip or Action bar -->
     <div class="tac-header">
       <div v-if="captchaData?.type === 'WORD_IMAGE_CLICK' || captchaData?.type === 'SHAPE_CLICK'" class="tac-word-tip">
@@ -361,6 +361,7 @@ const dragDropPos = computed(() => {
 
 // Word / Shape Click state
 const clickPoints = ref<{ x: number; y: number }[]>([]);
+const isShaking = ref(false);
 
 // Feedback Tip
 const tipState = reactive({
@@ -373,6 +374,12 @@ const showTip = (type: 'success' | 'error', text: string) => {
   tipState.show = true;
   tipState.type = type;
   tipState.text = text;
+  if (type === 'error') {
+    isShaking.value = true;
+    setTimeout(() => {
+      isShaking.value = false;
+    }, 400);
+  }
   setTimeout(() => {
     tipState.show = false;
   }, 1500);
@@ -793,6 +800,8 @@ defineExpose({
   border-radius: 6px;
   background: #f5f5f5;
   cursor: pointer;
+  touch-action: none;
+}
 }
 
 .tac-bg-img {
@@ -943,23 +952,34 @@ defineExpose({
 
 .tac-click-dot {
   position: absolute;
-  width: 22px;
-  height: 22px;
-  line-height: 22px;
+  width: 24px;
+  height: 24px;
+  line-height: 20px;
   text-align: center;
   background: #1890ff;
   color: #fff;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: bold;
   border-radius: 50%;
   border: 2px solid #ffffff;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
-  animation: tac-pop 0.2s ease-out;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.35);
+  animation: tac-pop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 
 @keyframes tac-pop {
-  0% { transform: scale(0.5); opacity: 0; }
+  0% { transform: scale(0.2); opacity: 0; }
+  70% { transform: scale(1.15); }
   100% { transform: scale(1); opacity: 1; }
+}
+
+.tac-shake {
+  animation: tac-shake 0.4s ease-in-out;
+}
+
+@keyframes tac-shake {
+  0%, 100% { transform: translateX(0); }
+  20%, 60% { transform: translateX(-6px); }
+  40%, 80% { transform: translateX(6px); }
 }
 
 .tac-tip {
@@ -1020,6 +1040,8 @@ defineExpose({
   border-radius: 20px;
   border: 1px solid #e4e7ed;
   overflow: hidden;
+  touch-action: none;
+}
 }
 
 .tac-track-bg {

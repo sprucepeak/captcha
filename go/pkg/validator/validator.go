@@ -422,17 +422,36 @@ func (b *BasicTrackValidator) Validate(track *model.ImageCaptchaTrack, validData
 		return model.CheckFail[interface{}]("检测到非人为机械滑动，请重试")
 	}
 
-	// 6. Acceleration check: human deceleration towards the end
+	// 5. 抖动与曲率特征分析 (人体工程学垂直离散特征)
+	// 真人手滑必定存在自然的生理微颤抖与曲率变化，而脚本往往生成绝对死板的完全平直线条
+	var yVariance float64
+	var totalMoveDist float64
+	for i := 1; i < len(trackList); i++ {
+		dy := trackList[i].Y - first.Y
+		yVariance += dy * dy
+		dx := trackList[i].X - trackList[i-1].X
+		dyStep := trackList[i].Y - trackList[i-1].Y
+		totalMoveDist += math.Sqrt(dx*dx + dyStep*dyStep)
+	}
+	yVariance /= float64(len(trackList) - 1)
+	// 如果滑动距离较长且点数较多，但全程没有任何微小的 Y 轴自然抖动 (方差极其接近 0)
+	if len(trackList) > 20 && totalMoveDist > 80 && yVariance < 0.001 {
+		return model.CheckFail[interface{}]("轨迹曲率异常，检测到自动化机械滑动")
+	}
+
+	// 6. 人体工程学加速度与末端减速特征检测
+	// 真人操作通常呈现“启动加速 -> 中段平稳移动 -> 临近目标减速微调”的生理曲线
 	splitPos := int(float64(len(trackList)) * 0.7)
-	if splitPos > 0 && splitPos < len(trackList) {
+	if splitPos > 4 && splitPos < len(trackList)-2 {
 		splitTrack := trackList[splitPos-1]
-		startAvgTime := splitTrack.T / float64(splitPos)
+		startAvgSpeed := splitTrack.X / math.Max(1, splitTrack.T)
 		lastTrack := trackList[len(trackList)-1]
-		endAvgTime := (lastTrack.T - splitTrack.T) / float64(len(trackList)-splitPos)
-		if endAvgTime <= startAvgTime {
-			// In some quick movements or mock tests, allow it or enforce based on strictness
-			// To strictly conform to Java:
-			// return model.CheckFail[interface{}]("basic check fail: velocity abnormal")
+		endDuration := math.Max(1, lastTrack.T-splitTrack.T)
+		endAvgSpeed := (lastTrack.X - splitTrack.X) / endDuration
+
+		// 检查极速恒定匀速脚本特征：前段与后段速度差值比例如果完全为 0 (绝对机械匀速)
+		if len(trackList) > 30 && math.Abs(startAvgSpeed-endAvgSpeed) < 0.0001 && startAvgSpeed > 0 {
+			return model.CheckFail[interface{}]("滑动加速度特征异常，请重试")
 		}
 	}
 

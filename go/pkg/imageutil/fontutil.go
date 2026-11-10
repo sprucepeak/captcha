@@ -4,6 +4,7 @@ import (
 	"image"
 	"image/color"
 	"image/draw"
+	"math"
 	"math/rand"
 	"os"
 
@@ -115,9 +116,64 @@ func DrawWordImg(word string, fnt *opentype.Font, fontSize float64, col color.Co
 	d.DrawString(word)
 
 	if deg != 0 {
-		return RotateImage(srcImg, deg), nil
+		srcImg = RotateImage(srcImg, deg)
 	}
-	return srcImg, nil
+
+	// 增加微小波浪扭曲与微扰 (Sine wave distortion / Warp)，破坏标准字形结构，有效对抗 OCR 提取
+	return WarpSinImage(srcImg, 2.5, 18.0), nil
+}
+
+// WarpSinImage applies a subtle horizontal & vertical sine wave distortion to the image
+func WarpSinImage(src *image.RGBA, amplitude, period float64) *image.RGBA {
+	b := src.Bounds()
+	w, h := b.Dx(), b.Dy()
+	dst := image.NewRGBA(image.Rect(0, 0, w, h))
+
+	phaseX := rand.Float64() * 2 * math.Pi
+	phaseY := rand.Float64() * 2 * math.Pi
+
+	for y := 0; y < h; y++ {
+		// x 轴微波偏移
+		xOffset := amplitude * math.Sin(2*math.Pi*float64(y)/period+phaseX)
+		for x := 0; x < w; x++ {
+			// y 轴微波偏移
+			yOffset := (amplitude * 0.6) * math.Cos(2*math.Pi*float64(x)/period+phaseY)
+
+			srcX := float64(x) + xOffset
+			srcY := float64(y) + yOffset
+
+			// 双线性采样
+			x0 := int(math.Floor(srcX))
+			y0 := int(math.Floor(srcY))
+			x1 := x0 + 1
+			y1 := y0 + 1
+
+			if x0 >= 0 && x1 < w && y0 >= 0 && y1 < h {
+				wx := srcX - float64(x0)
+				wy := srcY - float64(y0)
+
+				c00 := src.RGBAAt(x0, y0)
+				c10 := src.RGBAAt(x1, y0)
+				c01 := src.RGBAAt(x0, y1)
+				c11 := src.RGBAAt(x1, y1)
+
+				r := (1-wx)*(1-wy)*float64(c00.R) + wx*(1-wy)*float64(c10.R) + (1-wx)*wy*float64(c01.R) + wx*wy*float64(c11.R)
+				g := (1-wx)*(1-wy)*float64(c00.G) + wx*(1-wy)*float64(c10.G) + (1-wx)*wy*float64(c01.G) + wx*wy*float64(c11.G)
+				bVal := (1-wx)*(1-wy)*float64(c00.B) + wx*(1-wy)*float64(c10.B) + (1-wx)*wy*float64(c01.B) + wx*wy*float64(c11.B)
+				a := (1-wx)*(1-wy)*float64(c00.A) + wx*(1-wy)*float64(c10.A) + (1-wx)*wy*float64(c01.A) + wx*wy*float64(c11.A)
+
+				dst.SetRGBA(x, y, color.RGBA{
+					R: uint8(math.Round(r)),
+					G: uint8(math.Round(g)),
+					B: uint8(math.Round(bVal)),
+					A: uint8(math.Round(a)),
+				})
+			} else if x0 >= 0 && x0 < w && y0 >= 0 && y0 < h {
+				dst.SetRGBA(x, y, src.RGBAAt(x0, y0))
+			}
+		}
+	}
+	return dst
 }
 
 // DrawTipImage creates a prompt/tip banner containing target words with noise lines and points
@@ -170,5 +226,18 @@ var commonChars = []rune("的一是在不了有和人这中大为上个国我以
 func RandomChineseChar() string {
 	idx := rand.Intn(len(commonChars))
 	return string(commonChars[idx])
+}
+
+// RandomIdiomOrPoemPhrase returns a random 4-character idiom or poetry phrase
+var idiomPhrases = []string{
+	"如日中天", "风和日丽", "一马当先", "锦绣山河",
+	"海阔天空", "天朗气清", "春风化雨", "光明磊落",
+	"厚积薄发", "宁静致远", "志存高远", "乘风破浪",
+	"生龙活虎", "万里晴空", "紫气东来", "万象更新",
+	"星月交辉", "云淡风轻", "金石为开", "百花齐放",
+}
+
+func RandomIdiomOrPoemPhrase() string {
+	return idiomPhrases[rand.Intn(len(idiomPhrases))]
 }
 
