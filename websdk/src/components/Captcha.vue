@@ -644,18 +644,24 @@ const submitClickPoints = async () => {
   const bgW = captchaData.value.backgroundImageWidth;
   const bgH = captchaData.value.backgroundImageHeight;
 
-  const pointsTrack: CaptchaTrackPoint[] = clickPoints.value.map((pt, i) => ({
-    x: Math.round(pt.x / scale),
-    y: Math.round(pt.y / scale),
-    type: 'click',
-    t: i * 200 + 100
-  }));
+  // 使用真实点选时间戳，保留自然生理点击间隔
+  const firstClickT = trackList.value[0]?.t || 0;
+  const pointsTrack: CaptchaTrackPoint[] = clickPoints.value.map((pt, i) => {
+    const rawTrack = trackList.value[i];
+    const clickT = rawTrack ? rawTrack.t - firstClickT + 120 : (i + 1) * 350;
+    return {
+      x: Math.round(pt.x / scale),
+      y: Math.round(pt.y / scale),
+      type: 'click',
+      t: Math.max(80, clickT)
+    };
+  });
 
   const stopTime = Date.now();
   const trackData = {
     bgImageWidth: bgW,
     bgImageHeight: bgH,
-    startTime: startTime.value || Date.now() - 1000,
+    startTime: startTime.value || stopTime - (clickPoints.value.length * 350 + 200),
     stopTime,
     trackList: pointsTrack
   };
@@ -801,6 +807,8 @@ defineExpose({
   background: #f5f5f5;
   cursor: pointer;
   touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .tac-bg-img {
@@ -838,6 +846,7 @@ defineExpose({
   position: absolute;
   pointer-events: none;
   z-index: 10;
+  box-sizing: border-box;
 }
 
 .tac-crosshair-h {
@@ -845,8 +854,8 @@ defineExpose({
   left: 0;
   width: 100%;
   height: 0;
-  border-top: 1.5px dashed rgba(255, 255, 255, 0.9);
-  filter: drop-shadow(0 0 1px rgba(0, 0, 0, 0.7));
+  border-top: 2px dashed #ffffff;
+  filter: drop-shadow(0 0 1.5px rgba(0, 0, 0, 0.85));
   transform: translateY(-50%);
 }
 
@@ -855,8 +864,8 @@ defineExpose({
   left: 50%;
   width: 0;
   height: 100%;
-  border-left: 1.5px dashed rgba(255, 255, 255, 0.9);
-  filter: drop-shadow(0 0 1px rgba(0, 0, 0, 0.7));
+  border-left: 2px dashed #ffffff;
+  filter: drop-shadow(0 0 1.5px rgba(0, 0, 0, 0.85));
   transform: translateX(-50%);
 }
 

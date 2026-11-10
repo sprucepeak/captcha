@@ -344,7 +344,12 @@ func (v *SimpleValidator) validateClick(track *model.ImageCaptchaTrack, validDat
 		userX := clickTracks[i].X / float64(track.BgImageWidth)
 		userY := clickTracks[i].Y / float64(track.BgImageHeight)
 
-		if math.Abs(userX-pt[0]) > tolerant || math.Abs(userY-pt[1]) > tolerant {
+		// 使用欧氏距离 (Euclidean Distance) 判定圆形热区点击范围，相比切比雪夫矩形判定更符合人眼与手指点击习惯
+		dx := userX - pt[0]
+		dy := userY - pt[1]
+		dist := math.Sqrt(dx*dx + dy*dy)
+
+		if dist > tolerant {
 			return model.CheckFail[interface{}]("点选位置不匹配")
 		}
 	}
@@ -373,6 +378,12 @@ func (b *BasicTrackValidator) Validate(track *model.ImageCaptchaTrack, validData
 	}
 
 	cType, _ := validData["type"].(string)
+
+	// 点选类行为时间与反作弊检测
+	if cType == model.TypeWordImageClick || cType == model.TypeShapeClick {
+		return b.validateClickBehavior(track)
+	}
+
 	if cType != model.TypeSlider && cType != model.TypeSliderV2 && cType != model.TypeRotate && cType != model.TypeRotateDegree && cType != model.TypeConcat {
 		return res
 	}
@@ -452,6 +463,35 @@ func (b *BasicTrackValidator) Validate(track *model.ImageCaptchaTrack, validData
 		// 检查极速恒定匀速脚本特征：前段与后段速度差值比例如果完全为 0 (绝对机械匀速)
 		if len(trackList) > 30 && math.Abs(startAvgSpeed-endAvgSpeed) < 0.0001 && startAvgSpeed > 0 {
 			return model.CheckFail[interface{}]("滑动加速度特征异常，请重试")
+		}
+	}
+
+	return model.Success[interface{}](true)
+}
+
+// validateClickBehavior 针对文字点选和图形点选的行为与时间特征进行反作弊检测
+func (b *BasicTrackValidator) validateClickBehavior(track *model.ImageCaptchaTrack) model.ApiResponse[interface{}] {
+	var clickTracks []model.Track
+	for _, t := range track.TrackList {
+		if t.Type == model.TrackTypeClick || t.Type == "" {
+			clickTracks = append(clickTracks, t)
+		}
+	}
+	if len(clickTracks) == 0 {
+		return model.CheckFail[interface{}]("没有检测到点选操作")
+	}
+
+	// 1. 点选总耗时检测：生理上至少需要阅读和定位时间 (如 250ms)
+	totalDuration := track.StopTime - track.StartTime
+	if totalDuration < 250 {
+		return model.CheckFail[interface{}]("点击速度过快，请重试")
+	}
+
+	// 2. 连续点击间隔检测：防范脚本毫秒级瞬间连击 (单次点击间隔不应小于 50ms)
+	for i := 1; i < len(clickTracks); i++ {
+		interval := clickTracks[i].T - clickTracks[i-1].T
+		if interval < 50 {
+			return model.CheckFail[interface{}]("点击间隔异常，请重试")
 		}
 	}
 
